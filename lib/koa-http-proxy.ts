@@ -19,13 +19,13 @@ function makeProxyResponseAdapter(response: Response, done: (v?: unknown) => voi
     }
 
     // copy headers
-    for (const [headerName, headerval] of Object.entries(resAdapter.getHeaders())) {
-      if (headerval) {
-        if (typeof headerval == 'number') {
-          response.set(headerName, headerval.toString())
-        } else {
-          response.set(headerName, headerval)
-        }
+    for (const [headerName, headerVal] of Object.entries(resAdapter.getHeaders())) {
+      if (headerVal) {
+        response.set(headerName,
+          typeof headerVal === 'number'
+            ? headerVal.toString()
+            : headerVal
+        )
       }
     }
 
@@ -43,7 +43,7 @@ export default function(target: URL): Middleware {
   return async(ctx, next) => {
     await new Promise((resolve, reject) => {
       const resAdapter = makeProxyResponseAdapter(ctx.response, resolve)
-      proxy.web(ctx.req, resAdapter, reject)
+      proxy.web(ctx.req, resAdapter, { xfwd: true }, reject)
     })
 
     return next()
