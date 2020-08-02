@@ -1,2 +1,2 @@
 # koa-http-proxy
-Koa middleware powered by `http-party/node-http-proxy`
+Koa HTTP proxy middleware powered by `http-party/node-http-proxy`
