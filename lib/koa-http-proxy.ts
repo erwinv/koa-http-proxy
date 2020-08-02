@@ -10,7 +10,7 @@ const hardcodedOpts: ServerOptions = {
 }
 const unsupportedOpts = Object.keys(hardcodedOpts)
 
-type SupportedOpts = Omit<ServerOptions, keyof typeof hardcodedOpts>
+export type SupportedOpts = Omit<ServerOptions, keyof typeof hardcodedOpts>
 
 const defaultOpts: SupportedOpts = {
   xfwd: true,

@@ -1,7 +1,7 @@
 {
-  "name": "koa-http-proxy",
+  "name": "@erwinv/koa-http-proxy",
   "version": "1.0.0",
-  "description": "Koa middleware powered by http-party/node-http-proxy",
+  "description": "Koa HTTP proxy middleware powered by http-party/node-http-proxy.",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "directories": {
@@ -27,12 +27,22 @@
     "url": "https://github.com/erwinvil/koa-http-proxy/issues"
   },
   "homepage": "https://github.com/erwinvil/koa-http-proxy#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/http-proxy": "^1.17.4",
     "@types/koa": "^2.11.3",
-    "@types/node": "^13.13.4"
+    "@types/node": "^13.13.4",
+    "typescript": "^3.9.7"
   },
   "dependencies": {
-    "http-proxy": "^1.18.0"
+    "http-proxy": "^1.18.1"
+  },
+  "peerDependencies": {
+    "koa": "^2.13.0"
+  },
+  "engines": {
+    "node": ">=12.10.0"
   }
 }

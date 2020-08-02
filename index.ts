@@ -1,1 +1,4 @@
-export { default as KoaHttpProxy } from './lib/koa-http-proxy'
+export {
+  default as KoaHttpProxy,
+  SupportedOpts as KoaHttpProxyOpts,
+} from './lib/koa-http-proxy'
