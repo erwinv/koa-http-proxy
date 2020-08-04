@@ -4,7 +4,7 @@ Koa HTTP proxy middleware powered by [http-party/node-http-proxy](https://github
 ## Installation
 
 ```shell
-npm install @erwinv/koa-http-proxy
+npm install --save @erwinv/koa-http-proxy
 ```
 
 ## Usage
