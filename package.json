@@ -1,6 +1,6 @@
 {
   "name": "@erwinvil/koa-http-proxy",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Koa HTTP proxy middleware powered by http-party/node-http-proxy.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
