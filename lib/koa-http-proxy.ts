@@ -1,54 +1,92 @@
+import _ from 'lodash'
 import { OutgoingMessage, ServerResponse } from 'http'
-import { PassThrough } from 'stream'
+import { PassThrough, Readable } from 'stream'
 
-import { Middleware, Response } from 'koa'
-import { createProxy, ServerOptions } from 'http-proxy'
+import { Middleware, Request, Response, DefaultState } from 'koa'
+import { createProxy } from 'http-proxy'
 
-const hardcodedOpts: ServerOptions = {
-  ws: false,  // websockets not supported
-  target: '', // explicitly set through 1st arg to the middleware factory function
+import {
+  MiddlewareOpts,
+  UnsupportedOpts,
+  hardcodedOpts,
+  defaultOpts,
+  partitionSupportedOpts,
+} from './opts'
+
+const _isNotNil = _.negate(_.isNil)
+
+export interface StateWithProxyOpts extends DefaultState {
+  // opts that may be set dynamically at runtime (per request context)
+  proxyOpts?: MiddlewareOpts & UnsupportedOpts
 }
-const unsupportedOpts = Object.keys(hardcodedOpts)
 
-export type SupportedOpts = Omit<ServerOptions, keyof typeof hardcodedOpts>
-
-const defaultOpts: SupportedOpts = {
-  xfwd: true,
-}
-
-export default function (target: URL, opts: SupportedOpts = {}): Middleware {
+export function HttpProxyMiddleware(target: URL, opts: MiddlewareOpts = {}): Middleware<StateWithProxyOpts> {
   const proxy = createProxy({
     ...hardcodedOpts,
     ...defaultOpts,
-    ...opts,
+    ...opts, // opts set at init/start-up
     target,
   })
 
   return async (ctx, next) => {
-    const opts = ctx.state.proxyOpts as ServerOptions | undefined
+    const [opts, unsupportedOpts] = partitionSupportedOpts(ctx.state.proxyOpts)
 
-    const illegalOpts = Object.keys(opts ?? {}).filter(opt => unsupportedOpts.includes(opt))
-    ctx.assert(illegalOpts.length === 0, 500, `Illegal proxy options: ${illegalOpts}`)
+    ctx.assert(_.isEmpty(unsupportedOpts), 500, `Unsupported proxy options: ${_.keys(unsupportedOpts)}`)
 
     await new Promise((resolve, reject) => {
+      const reqBodyAdapter = maybeRestreamRequestBody(ctx.request)
       const resAdapter = makeProxyResponseAdapter(ctx.response, resolve)
-      proxy.web(ctx.req, resAdapter, opts, reject)
+
+      const runtimeOpts = _.pickBy({
+        ...opts,
+        buffer: reqBodyAdapter,
+      }, _isNotNil)
+
+      proxy.web(ctx.req, resAdapter, runtimeOpts, reject)
     })
 
     return next()
   }
 }
 
-function makeProxyResponseAdapter(response: Response, done: (v?: unknown) => void): ServerResponse {
-  const resAdapter: ServerResponse = new OutgoingMessage() as any
+interface RequestWithAlreadyParsedBody extends Request {
+  rawBody?: string
+  body?: string | object
+}
+
+function maybeRestreamRequestBody(request: RequestWithAlreadyParsedBody): Readable | undefined {
+  if (_.isString(request.rawBody)) {
+    // this could very easily cause bugs if API implementers
+    // (1) use a request body parser; AND
+    // (2) modify/override the parsed body WITHOUT updating the rawBody
+    // still we prefer the rawBody over the parsed body to avoid calling JSON.stringify as much as possible
+    return Readable.from(request.rawBody)
+  }
+
+  if (_.isNil(request.body)) {
+    return undefined
+  }
+
+  const reqBodyStr = _.isString(request.body) ? request.body : JSON.stringify(request.body)
+  return Readable.from(reqBodyStr)
+}
+
+function makeProxyResponseAdapter(response: Response, done: (v?: any) => void): ServerResponse {
+  const resAdapter = new OutgoingMessage() as ServerResponse
 
   resAdapter.on('pipe', (proxyRes) => {
     proxyRes.unpipe(resAdapter)
 
     response.status = resAdapter.statusCode
     response.message = resAdapter.statusMessage
-    Object.entries(resAdapter.getHeaders())
-      .forEach(([headerName, headerVal]) => response.set(headerName, headerVal as string))
+
+    for (const [headerName, headerVal] of Object.entries(resAdapter.getHeaders())) {
+      if (_.isNil(headerVal)) {
+        continue
+      }
+      response.set(headerName, _.isNumber(headerVal) ? _.toString(headerVal) : headerVal)
+    }
+
     response.body = proxyRes.pipe(new PassThrough())
 
     done()

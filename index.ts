@@ -1,4 +1,8 @@
 export {
-  default as KoaHttpProxy,
-  SupportedOpts as KoaHttpProxyOpts,
+  HttpProxyMiddleware as KoaHttpProxy,
+  StateWithProxyOpts,
 } from './lib/koa-http-proxy'
+
+export {
+  MiddlewareOpts as KoaHttpProxyOpts,
+} from './lib/opts'
