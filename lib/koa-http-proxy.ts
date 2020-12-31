@@ -94,3 +94,26 @@ function makeProxyResponseAdapter(response: Response, done: (v?: any) => void): 
 
   return resAdapter
 }
+
+export function BufferResponseBody(middlewareOrder: 'post' | 'pre' = 'pre'): Middleware {
+  return async (ctx, next) => {
+    if (middlewareOrder === 'pre') {
+      await next()
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      let chunks = [] as Uint8Array[];
+      (<Readable>ctx.response.body as PassThrough)
+        .on('error', reject)
+        .on('data', chunk => chunks.push(chunk))
+        .on('end', () => {
+          ctx.response.body = Buffer.concat(chunks)
+          resolve()
+        })
+    });
+
+    if (middlewareOrder === 'post') {
+      return next()
+    }
+  }
+}

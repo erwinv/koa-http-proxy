@@ -13,6 +13,7 @@ npm install --save @erwinv/koa-http-proxy
 import {
   KoaHttpProxy,
   StateWithProxyOpts,
+  BufferResponseBody,
 } from '@erwinv/koa-http-proxy'
 
 import { default as Koa, Middleware } from 'koa'
@@ -29,6 +30,7 @@ new Koa()
 
     return next()
   }) as Middleware<StateWithProxyOpts>)
+  // .use(BufferResponseBody()) // to buffer the response.body stream into a Buffer
   .use(KoaHttpProxy(new URL(process.env.PROXY_TARGET), {
     xfwd: process.env.PROXY_TARGET_IS_EXTERNAL?.toLowerCase() !== 'true',
     proxyTimeout: 60 * 1000,
