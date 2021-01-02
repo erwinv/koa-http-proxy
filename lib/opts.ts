@@ -2,8 +2,8 @@ import _ from 'lodash'
 import { ServerOptions as ProxyOpts } from 'http-proxy'
 
 const supportedOpts = [
-  // 'target',
-  // 'forward', // https://github.com/http-party/node-http-proxy/issues/773
+  'target',
+  'forward', // https://github.com/http-party/node-http-proxy/issues/773
   'agent',
   'ssl',
   // 'ws',
@@ -26,19 +26,12 @@ const supportedOpts = [
   'timeout',
   'followRedirects',
   // 'selfHandleResponse',
-  // 'buffer',
+  'buffer',
 ] as const
 
 export type MiddlewareOpts = Pick<ProxyOpts, typeof supportedOpts[number]>
+export type InitOpts = Required<Pick<MiddlewareOpts, 'target'>> & Omit<MiddlewareOpts, 'target' | 'buffer'>
 export type UnsupportedOpts = Record<string, any>
-
-export const hardcodedOpts: ProxyOpts = {
-  ws: false,
-}
-
-export const defaultOpts: MiddlewareOpts = {
-  xfwd: true,
-}
 
 export function partitionSupportedOpts(opts?: MiddlewareOpts & UnsupportedOpts): readonly [MiddlewareOpts, UnsupportedOpts] {
   return [

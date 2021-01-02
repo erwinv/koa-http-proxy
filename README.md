@@ -30,10 +30,10 @@ new Koa()
 
     return next()
   }) as Middleware<StateWithProxyOpts>)
-  // .use(BufferResponseBody()) // to buffer the response.body stream into a Buffer
-  .use(KoaHttpProxy(new URL(process.env.PROXY_TARGET), {
-    xfwd: process.env.PROXY_TARGET_IS_EXTERNAL?.toLowerCase() !== 'true',
+  .use(KoaHttpProxy({
+    target: process.env.PROXY_TARGET,
+    xfwd: true,
     proxyTimeout: 60 * 1000,
-  }))
+  }, true))
   .listen(process.env.PORT)
 ```

@@ -7,9 +7,8 @@ import { createProxy } from 'http-proxy'
 
 import {
   MiddlewareOpts,
+  InitOpts,
   UnsupportedOpts,
-  hardcodedOpts,
-  defaultOpts,
   partitionSupportedOpts,
 } from './opts'
 
@@ -20,13 +19,8 @@ export interface StateWithProxyOpts extends DefaultState {
   proxyOpts?: MiddlewareOpts & UnsupportedOpts
 }
 
-export function HttpProxyMiddleware(target: URL, opts: MiddlewareOpts = {}): Middleware<StateWithProxyOpts> {
-  const proxy = createProxy({
-    ...hardcodedOpts,
-    ...defaultOpts,
-    ...opts, // opts set at init/start-up
-    target,
-  })
+export function HttpProxyMiddleware(opts: InitOpts, bufferRespBody = false): Middleware<StateWithProxyOpts> {
+  const proxy = createProxy(opts) // opts set at init/start-up
 
   return async (ctx, next) => {
     const [opts, unsupportedOpts] = partitionSupportedOpts(ctx.state.proxyOpts)
@@ -37,13 +31,17 @@ export function HttpProxyMiddleware(target: URL, opts: MiddlewareOpts = {}): Mid
       const reqBodyAdapter = maybeRestreamRequestBody(ctx.request)
       const resAdapter = makeProxyResponseAdapter(ctx.response, resolve)
 
-      const runtimeOpts = _.pickBy({
+      const runtimeOpts = _.pickBy<MiddlewareOpts>({
         ...opts,
         buffer: reqBodyAdapter,
       }, _isNotNil)
 
       proxy.web(ctx.req, resAdapter, runtimeOpts, reject)
     })
+
+    if (bufferRespBody) {
+      await bufferResponseBody(ctx.response)
+    }
 
     return next()
   }
@@ -95,25 +93,19 @@ function makeProxyResponseAdapter(response: Response, done: (v?: any) => void): 
   return resAdapter
 }
 
-export function BufferResponseBody(middlewareOrder: 'post' | 'pre' = 'pre'): Middleware {
-  return async (ctx, next) => {
-    if (middlewareOrder === 'pre') {
-      await next()
-    }
+async function bufferResponseBody(response: Response) {
+  const responseBodyStream = response.body as PassThrough
 
-    await new Promise<void>((resolve, reject) => {
-      let chunks = [] as Uint8Array[];
-      (<Readable>ctx.response.body as PassThrough)
-        .on('error', reject)
-        .on('data', chunk => chunks.push(chunk))
-        .on('end', () => {
-          ctx.response.body = Buffer.concat(chunks)
-          resolve()
-        })
-    });
+  const bufferedResponseBody = await new Promise<Buffer>((resolve, reject) => {
+    let chunks = [] as Uint8Array[]
 
-    if (middlewareOrder === 'post') {
-      return next()
-    }
-  }
+    responseBodyStream
+      .on('error', reject)
+      .on('data', chunk => chunks.push(chunk))
+      .on('end', () => {
+        resolve(Buffer.concat(chunks))
+      })
+  })
+
+  response.body = bufferedResponseBody
 }
