@@ -3,7 +3,7 @@ import { OutgoingMessage, ServerResponse } from 'http'
 import { PassThrough, Readable } from 'stream'
 
 import { Middleware, Request, Response, DefaultState } from 'koa'
-import { createProxy } from 'http-proxy'
+import { createProxy, ServerOptions as ProxyOpts } from 'http-proxy'
 
 import {
   MiddlewareOpts,
@@ -19,8 +19,13 @@ export interface StateWithProxyOpts extends DefaultState {
   proxyOpts?: MiddlewareOpts & UnsupportedOpts
 }
 
-export function HttpProxyMiddleware(opts: InitOpts, bufferRespBody = false): Middleware<StateWithProxyOpts> {
-  const proxy = createProxy(opts) // opts set at init/start-up
+type ProxyTarget = NonNullable<ProxyOpts['target']>
+
+export function HttpProxyMiddleware(target: ProxyTarget, opts: InitOpts, bufferRespBody = false): Middleware<StateWithProxyOpts> {
+  const proxy = createProxy({
+    ...opts, // opts set at init/start-up
+    target,
+  })
 
   return async (ctx, next) => {
     const [opts, unsupportedOpts] = partitionSupportedOpts(ctx.state.proxyOpts)
