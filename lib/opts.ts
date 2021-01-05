@@ -29,8 +29,9 @@ const supportedOpts = [
   'buffer',
 ] as const
 
-export type MiddlewareOpts = Pick<ProxyOpts, typeof supportedOpts[number]>
-export type InitOpts = Omit<MiddlewareOpts, 'buffer'>
+export type MiddlewareOpts = Pick<ProxyOpts, typeof supportedOpts[number]> & {
+  bufferResponseBody?: boolean
+}
 export type UnsupportedOpts = Record<string, any>
 
 export function partitionSupportedOpts(opts?: MiddlewareOpts & UnsupportedOpts): readonly [MiddlewareOpts, UnsupportedOpts] {
