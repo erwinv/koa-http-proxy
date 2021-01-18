@@ -3,47 +3,48 @@ import { OutgoingMessage, ServerResponse } from 'http'
 import { PassThrough, Readable } from 'stream'
 
 import { Middleware, Request, Response, DefaultState } from 'koa'
-import { createProxy } from 'http-proxy'
+import { createProxy, ServerOptions as ProxyOpts } from 'http-proxy'
 
 import {
   MiddlewareOpts,
   UnsupportedOpts,
-  hardcodedOpts,
-  defaultOpts,
   partitionSupportedOpts,
 } from './opts'
 
 const _isNotNil = _.negate(_.isNil)
 
 export interface StateWithProxyOpts extends DefaultState {
-  // opts that may be set dynamically at runtime (per request context)
   proxyOpts?: MiddlewareOpts & UnsupportedOpts
 }
 
-export function HttpProxyMiddleware(target: URL, opts: MiddlewareOpts = {}): Middleware<StateWithProxyOpts> {
+type ProxyTarget = NonNullable<ProxyOpts['target']>
+
+export function HttpProxyMiddleware(target: ProxyTarget, initOpts: MiddlewareOpts): Middleware<StateWithProxyOpts> {
   const proxy = createProxy({
-    ...hardcodedOpts,
-    ...defaultOpts,
-    ...opts, // opts set at init/start-up
+    ...initOpts,
     target,
   })
 
   return async (ctx, next) => {
-    const [opts, unsupportedOpts] = partitionSupportedOpts(ctx.state.proxyOpts)
+    const [runtimeOpts, unsupportedOpts] = partitionSupportedOpts(ctx.state.proxyOpts)
 
     ctx.assert(_.isEmpty(unsupportedOpts), 500, `Unsupported proxy options: ${_.keys(unsupportedOpts)}`)
 
     await new Promise((resolve, reject) => {
-      const reqBodyAdapter = maybeRestreamRequestBody(ctx.request)
+      const reqBodyAdapter = runtimeOpts.buffer ?? maybeRestreamRequestBody(ctx.request)
       const resAdapter = makeProxyResponseAdapter(ctx.response, resolve)
 
-      const runtimeOpts = _.pickBy({
-        ...opts,
+      const opts = _.pickBy<MiddlewareOpts>({
+        ...runtimeOpts,
         buffer: reqBodyAdapter,
       }, _isNotNil)
 
-      proxy.web(ctx.req, resAdapter, runtimeOpts, reject)
+      proxy.web(ctx.req, resAdapter, opts, reject)
     })
+
+    if (runtimeOpts.bufferResponseBody ?? initOpts.bufferResponseBody ?? false) {
+      await bufferResponseBody(ctx.response)
+    }
 
     return next()
   }
@@ -93,4 +94,21 @@ function makeProxyResponseAdapter(response: Response, done: (v?: any) => void): 
   })
 
   return resAdapter
+}
+
+async function bufferResponseBody(response: Response) {
+  const responseBodyStream = response.body as PassThrough
+
+  const bufferedResponseBody = await new Promise<Buffer>((resolve, reject) => {
+    let chunks = [] as Uint8Array[]
+
+    responseBodyStream
+      .on('error', reject)
+      .on('data', chunk => chunks.push(chunk))
+      .on('end', () => {
+        resolve(Buffer.concat(chunks))
+      })
+  })
+
+  response.body = bufferedResponseBody
 }
