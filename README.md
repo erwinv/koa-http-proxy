@@ -10,17 +10,19 @@ npm install --save @erwinv/koa-http-proxy
 ## Usage
 
 ```typescript
+import Koa from 'koa'
+import mount from 'koa-mount'
 import { KoaHttpProxy } from '@erwinv/koa-http-proxy'
 
-import { default as Koa, Middleware } from 'koa'
+const proxy = KoaHttpProxy('https://www.example.com', {
+  xfwd: true,
+  changeOrigin: true,
+  followRedirects: true,
+  proxyTimeout: 60 * 1000,
+})
 
 new Koa()
-  .use(KoaHttpProxy(process.env.PROXY_TARGET, {
-    xfwd: true,
-    changeOrigin: true,
-    followRedirects: true,
-    proxyTimeout: 60 * 1000,
-  }))
+  .use(mount('/proxy/example', proxy))
   .listen(process.env.PORT)
 ```
 
